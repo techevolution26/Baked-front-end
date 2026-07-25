@@ -14,7 +14,11 @@ export const metadata: Metadata = {
   description: "Design your cake, tap and drag -- no typing required.",
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const token = await getToken();
   const [bakery, user] = await Promise.all([
     getCurrentBakery(),
@@ -23,10 +27,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en">
-      <body className={`${fraunces.variable} ${inter.variable} font-sans bg-buttercream`}>
+      <body
+        className={`${fraunces.variable} ${inter.variable} font-sans bg-buttercream`}
+      >
         <SiteHeader
           isLoggedIn={!!user}
-          isBakeryOwner={user?.role === "bakery_owner" || user?.role === "admin"}
+          isBakeryOwner={
+            user?.role === "bakery_owner" || user?.role === "admin"
+          }
+          isCustomer={user?.role === "customer"}
           siteName={bakery?.name ?? "Cake Marketplace"}
         />
         {children}

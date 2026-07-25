@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 export default function SiteHeader({
   isLoggedIn,
   isBakeryOwner,
+  isCustomer,
   siteName,
 }: {
   isLoggedIn: boolean;
   isBakeryOwner: boolean;
+  isCustomer: boolean;
   siteName: string;
 }) {
   const router = useRouter();
@@ -28,9 +30,11 @@ export default function SiteHeader({
       <nav className="flex items-center gap-4 text-sm">
         {isLoggedIn ? (
           <>
-            <Link href="/orders" className="text-cocoa/70 hover:text-berry">
-              My orders
-            </Link>
+            {isCustomer && (
+              <Link href="/orders" className="text-cocoa/70 hover:text-berry">
+                My orders
+              </Link>
+            )}
             <Link href="/account" className="text-cocoa/70 hover:text-berry">
               Account
             </Link>

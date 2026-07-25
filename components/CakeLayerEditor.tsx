@@ -1,4 +1,3 @@
-// components/CakeLayerEditor.tsx
 "use client";
 
 /**
@@ -8,16 +7,31 @@
  * - Tap a tier to select it, tap a swatch to color it
  * - Tap a sticker in the tray to add it to the cake
  * - Drag any placed sticker directly on the canvas to reposition it
+ * - Add/remove tiers and pick each tier's shape independently (they
+ *   can be mixed -- a round bottom with a square top, etc.)
  *
- * Emits a `layers[]` array matching the blueprint schema — ready to POST.
+ * Geometry comes from lib/cakeLayout.ts, shared with Cake3DPreview so
+ * the two never disagree about tier sizes/positions.
+ *
+ * Emits { layers, tiers } via onChange -- ready to POST as part of a
+ * blueprint or template.
  */
 
 import { useState } from "react";
-import { Stage, Layer, Circle, Image as KonvaImage } from "react-konva";
+import { Stage, Layer, Ellipse, Rect, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 import { v4 as uuid } from "uuid";
 import type { KonvaEventObject } from "konva/lib/Node";
 import type { BlueprintLayer } from "@/types/api";
+import {
+  CANVAS_W,
+  CANVAS_H,
+  MIN_TIERS,
+  MAX_TIERS,
+  computeTierLayouts,
+  type TierConfig,
+  type TierShape,
+} from "@/lib/cakeLayout";
 
 type ColorSwatch = { id: string; hex: string; name: string };
 type StickerAsset = { id: string; thumbnailUrl: string; name: string };
@@ -29,12 +43,23 @@ type PlacedSticker = {
   scale: number;
 };
 
+// A proper palette, not five colors -- the "cake museum" range across
+// warm, cool, pastel, and deep tones.
 const SWATCHES: ColorSwatch[] = [
   { id: "sw_berry", hex: "#C13F5E", name: "Berry" },
   { id: "sw_gold", hex: "#D4A537", name: "Gold" },
   { id: "sw_cream", hex: "#FFF3DE", name: "Cream" },
   { id: "sw_mint", hex: "#8FBF9F", name: "Mint" },
   { id: "sw_cocoa", hex: "#5A3B2E", name: "Cocoa" },
+  { id: "sw_blush", hex: "#F3C6D3", name: "Blush" },
+  { id: "sw_sky", hex: "#A9D3E5", name: "Sky" },
+  { id: "sw_lavender", hex: "#C9B6E4", name: "Lavender" },
+  { id: "sw_sunshine", hex: "#F6D86B", name: "Sunshine" },
+  { id: "sw_coral", hex: "#F2896B", name: "Coral" },
+  { id: "sw_sage", hex: "#B4C7A5", name: "Sage" },
+  { id: "sw_charcoal", hex: "#3B2E35", name: "Charcoal" },
+  { id: "sw_ivory", hex: "#FBF8F1", name: "Ivory" },
+  { id: "sw_plum", hex: "#7B4B6A", name: "Plum" },
 ];
 
 const STICKERS: StickerAsset[] = [
@@ -45,14 +70,6 @@ const STICKERS: StickerAsset[] = [
     thumbnailUrl: "/stickers/flower.png",
     name: "Flower",
   },
-];
-
-const CANVAS_W = 360;
-const CANVAS_H = 420;
-
-const TIERS = [
-  { cx: CANVAS_W / 2, cy: 300, r: 110 },
-  { cx: CANVAS_W / 2, cy: 190, r: 80 },
 ];
 
 function PlacedStickerImage({
@@ -84,8 +101,12 @@ function PlacedStickerImage({
 export default function CakeLayerEditor({
   onChange,
 }: {
-  onChange?: (layers: BlueprintLayer[]) => void;
+  onChange?: (data: { layers: BlueprintLayer[]; tiers: TierConfig[] }) => void;
 }) {
+  const [tiers, setTiers] = useState<TierConfig[]>([
+    { shape: "round" },
+    { shape: "round" },
+  ]);
   const [tierColors, setTierColors] = useState<string[]>([
     "#FFF3DE",
     "#FFF3DE",
@@ -93,7 +114,11 @@ export default function CakeLayerEditor({
   const [selectedTier, setSelectedTier] = useState(0);
   const [placed, setPlaced] = useState<PlacedSticker[]>([]);
 
-  function emit(nextColors: string[], nextPlaced: PlacedSticker[]) {
+  function emit(
+    nextColors: string[],
+    nextPlaced: PlacedSticker[],
+    nextTiers: TierConfig[],
+  ) {
     const layers: BlueprintLayer[] = [
       ...nextColors.map((hex, i) => ({
         type: "color_fill" as const,
@@ -111,36 +136,57 @@ export default function CakeLayerEditor({
       })),
     ];
 
-    onChange?.(layers);
+    onChange?.({ layers, tiers: nextTiers });
   }
 
   function pickColor(hex: string) {
     const next = [...tierColors];
     next[selectedTier] = hex;
     setTierColors(next);
-    emit(next, placed);
+    emit(next, placed, tiers);
   }
 
   function addSticker(asset: StickerAsset) {
     const next = [
       ...placed,
-      {
-        key: uuid(),
-        asset,
-        x: CANVAS_W / 2,
-        y: CANVAS_H / 2,
-        scale: 1,
-      },
+      { key: uuid(), asset, x: CANVAS_W / 2, y: CANVAS_H / 2, scale: 1 },
     ];
     setPlaced(next);
-    emit(tierColors, next);
+    emit(tierColors, next, tiers);
   }
 
   function moveSticker(key: string, x: number, y: number) {
     const next = placed.map((s) => (s.key === key ? { ...s, x, y } : s));
     setPlaced(next);
-    emit(tierColors, next);
+    emit(tierColors, next, tiers);
   }
+
+  function addTier() {
+    if (tiers.length >= MAX_TIERS) return;
+    const nextTiers = [...tiers, { shape: "round" as TierShape }];
+    const nextColors = [...tierColors, "#FFF3DE"];
+    setTiers(nextTiers);
+    setTierColors(nextColors);
+    emit(nextColors, placed, nextTiers);
+  }
+
+  function removeTier() {
+    if (tiers.length <= MIN_TIERS) return;
+    const nextTiers = tiers.slice(0, -1);
+    const nextColors = tierColors.slice(0, -1);
+    setTiers(nextTiers);
+    setTierColors(nextColors);
+    setSelectedTier((s) => Math.min(s, nextTiers.length - 1));
+    emit(nextColors, placed, nextTiers);
+  }
+
+  function setTierShape(index: number, shape: TierShape) {
+    const nextTiers = tiers.map((t, i) => (i === index ? { shape } : t));
+    setTiers(nextTiers);
+    emit(tierColors, placed, nextTiers);
+  }
+
+  const tierLayouts = computeTierLayouts(tiers);
 
   return (
     <div className="flex flex-col gap-6 md:flex-row md:items-start">
@@ -150,19 +196,41 @@ export default function CakeLayerEditor({
       >
         <Stage width={CANVAS_W} height={CANVAS_H}>
           <Layer>
-            {TIERS.map((t, i) => (
-              <Circle
-                key={i}
-                x={t.cx}
-                y={t.cy}
-                radius={t.r}
-                fill={tierColors[i]}
-                stroke={selectedTier === i ? "#C13F5E" : "rgba(0,0,0,0.08)"}
-                strokeWidth={selectedTier === i ? 3 : 1}
-                onClick={() => setSelectedTier(i)}
-                onTap={() => setSelectedTier(i)}
-              />
-            ))}
+            {tierLayouts.map((t, i) => {
+              const isSelected = selectedTier === i;
+              const stroke = isSelected ? "#C13F5E" : "rgba(0,0,0,0.08)";
+              const strokeWidth = isSelected ? 3 : 1;
+              const onSelect = () => setSelectedTier(i);
+
+              return t.shape === "round" ? (
+                <Ellipse
+                  key={i}
+                  x={t.centerX}
+                  y={t.centerY}
+                  radiusX={t.width / 2}
+                  radiusY={t.height / 2}
+                  fill={tierColors[i]}
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                  onClick={onSelect}
+                  onTap={onSelect}
+                />
+              ) : (
+                <Rect
+                  key={i}
+                  x={t.centerX - t.width / 2}
+                  y={t.topY}
+                  width={t.width}
+                  height={t.height}
+                  cornerRadius={6}
+                  fill={tierColors[i]}
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                  onClick={onSelect}
+                  onTap={onSelect}
+                />
+              );
+            })}
 
             {placed.map((s) => (
               <PlacedStickerImage
@@ -175,7 +243,65 @@ export default function CakeLayerEditor({
         </Stage>
       </div>
 
-      <div className="flex w-full flex-col gap-6 md:w-48">
+      <div className="flex w-full flex-col gap-6 md:w-56">
+        <div>
+          <p className="mb-2 text-sm font-medium text-[#5A3B2E]">Tiers</p>
+          <div className="flex flex-col gap-2">
+            {tiers.map((tier, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setSelectedTier(i)}
+                  className={`rounded-lg px-2 py-1 text-xs ${
+                    selectedTier === i
+                      ? "bg-[#C13F5E] text-white"
+                      : "border border-[#5A3B2E]/20 bg-white text-[#5A3B2E]"
+                  }`}
+                >
+                  Tier {i + 1}
+                </button>
+                <button
+                  onClick={() => setTierShape(i, "round")}
+                  aria-label={`Tier ${i + 1} round`}
+                  className={`rounded-lg px-2 py-1 text-xs ${
+                    tier.shape === "round"
+                      ? "bg-[#D4A537] text-white"
+                      : "border border-[#5A3B2E]/20 bg-white text-[#5A3B2E]"
+                  }`}
+                >
+                  Round
+                </button>
+                <button
+                  onClick={() => setTierShape(i, "square")}
+                  aria-label={`Tier ${i + 1} square`}
+                  className={`rounded-lg px-2 py-1 text-xs ${
+                    tier.shape === "square"
+                      ? "bg-[#D4A537] text-white"
+                      : "border border-[#5A3B2E]/20 bg-white text-[#5A3B2E]"
+                  }`}
+                >
+                  Square
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={addTier}
+              disabled={tiers.length >= MAX_TIERS}
+              className="rounded-lg border border-[#5A3B2E]/20 bg-white px-3 py-1.5 text-xs disabled:opacity-40"
+            >
+              + Add tier
+            </button>
+            <button
+              onClick={removeTier}
+              disabled={tiers.length <= MIN_TIERS}
+              className="rounded-lg border border-[#5A3B2E]/20 bg-white px-3 py-1.5 text-xs disabled:opacity-40"
+            >
+              − Remove tier
+            </button>
+          </div>
+        </div>
+
         <div>
           <p className="mb-2 text-sm font-medium text-[#5A3B2E]">
             Tap a tier, then a color
@@ -186,7 +312,7 @@ export default function CakeLayerEditor({
                 key={sw.id}
                 aria-label={sw.name}
                 onClick={() => pickColor(sw.hex)}
-                className="h-10 w-10 rounded-full border-2 border-white shadow ring-1 ring-black/10 focus:outline-none focus:ring-2 focus:ring-[#C13F5E]"
+                className="h-9 w-9 rounded-full border-2 border-white shadow ring-1 ring-black/10 focus:outline-none focus:ring-2 focus:ring-[#C13F5E]"
                 style={{ backgroundColor: sw.hex }}
               />
             ))}
