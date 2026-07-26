@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type { BlueprintLayer } from "@/types/api";
 import type { TierConfig } from "@/lib/cakeLayout";
+import ImageUploadField from "@/components/ImageUploadField";
 
 const CakeLayerEditor = dynamic(() => import("@/components/CakeLayerEditor"), {
   ssr: false,
@@ -43,6 +44,10 @@ export default function NewTemplatePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!coverImageUrl) {
+      setError("Please provide a cover Photo");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -124,20 +129,12 @@ export default function NewTemplatePage() {
           </div>
           <div>
             <p className="text-xs text-cocoa/50 uppercase tracking-wide mb-1">
-              Cover photo -- what customers actually see and order from
+              Cover photo -- what customers actually see and order
             </p>
-            <input
+            <ImageUploadField
               value={coverImageUrl}
-              onChange={(e) => setCoverImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-xl border border-cocoa/20 px-4 py-3"
-              required
+              onChange={setCoverImageUrl}
             />
-            <p className="text-xs text-cocoa/40 mt-1">
-              A real photo, not a placeholder -- the canvas below is for
-              configuring the design, not for showing customers what they're
-              ordering.
-            </p>
           </div>
         </div>
 
