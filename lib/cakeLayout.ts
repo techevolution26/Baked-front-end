@@ -7,8 +7,8 @@
  * either renderer.
  */
 
-export type TierShape = "round" | "square";
-export type TierConfig = { shape: TierShape };
+import type { TierShape, TierConfig } from "@/types/api";
+export type { TierShape, TierConfig };
 
 export const CANVAS_W = 360;
 export const CANVAS_H = 420;

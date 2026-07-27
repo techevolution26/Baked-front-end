@@ -7,8 +7,12 @@
  * - Tap a tier to select it, tap a swatch to color it
  * - Tap a sticker in the tray to add it to the cake
  * - Drag any placed sticker directly on the canvas to reposition it
- * - Add/remove tiers and pick each tier's shape independently (they
- *   can be mixed -- a round bottom with a square top, etc.)
+ * - Add/remove tiers and pick each tier's shape independently (mixable)
+ *
+ * Pass `initial` to seed the canvas from an existing design (a
+ * template's authored default, or a customer re-opening their own
+ * saved blueprint) instead of starting blank -- this is what makes
+ * "edit the original, or leave it as-is" both work correctly.
  *
  * Geometry comes from lib/cakeLayout.ts, shared with Cake3DPreview so
  * the two never disagree about tier sizes/positions.
@@ -43,8 +47,6 @@ type PlacedSticker = {
   scale: number;
 };
 
-// A proper palette, not five colors -- the "cake museum" range across
-// warm, cool, pastel, and deep tones.
 const SWATCHES: ColorSwatch[] = [
   { id: "sw_berry", hex: "#C13F5E", name: "Berry" },
   { id: "sw_gold", hex: "#D4A537", name: "Gold" },
@@ -62,15 +64,70 @@ const SWATCHES: ColorSwatch[] = [
   { id: "sw_plum", hex: "#7B4B6A", name: "Plum" },
 ];
 
+// Inline SVGs as data URIs -- no /public files to go missing, no
+// network request, no 404s possible. Colors match the brand palette.
+function svgToDataUri(svg: string) {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+const HEART_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"><path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5 C2,5.41 4.42,3 7.5,3 C9.24,3 10.91,3.81 12,5.08 C13.09,3.81 14.76,3 16.5,3 C19.58,3 22,5.41 22,8.5 C22,12.27 18.6,15.36 13.45,20.03 L12,21.35 Z" fill="#C13F5E"/></svg>`;
+
+const STAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"><path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z" fill="#D4A537"/></svg>`;
+
+const FLOWER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"><g fill="#F3C6D3"><ellipse cx="12" cy="6" rx="3" ry="4.2"/><ellipse cx="12" cy="6" rx="3" ry="4.2" transform="rotate(72 12 12)"/><ellipse cx="12" cy="6" rx="3" ry="4.2" transform="rotate(144 12 12)"/><ellipse cx="12" cy="6" rx="3" ry="4.2" transform="rotate(216 12 12)"/><ellipse cx="12" cy="6" rx="3" ry="4.2" transform="rotate(288 12 12)"/></g><circle cx="12" cy="12" r="3" fill="#D4A537"/></svg>`;
+
 const STICKERS: StickerAsset[] = [
-  { id: "sticker_heart", thumbnailUrl: "/stickers/heart.png", name: "Heart" },
-  { id: "sticker_star", thumbnailUrl: "/stickers/star.png", name: "Star" },
+  { id: "sticker_heart", thumbnailUrl: svgToDataUri(HEART_SVG), name: "Heart" },
+  { id: "sticker_star", thumbnailUrl: svgToDataUri(STAR_SVG), name: "Star" },
   {
     id: "sticker_flower",
-    thumbnailUrl: "/stickers/flower.png",
+    thumbnailUrl: svgToDataUri(FLOWER_SVG),
     name: "Flower",
   },
 ];
+
+/** Reconstructs editor state from a saved layers[] array -- used to
+ * seed the canvas from a template's default design or a customer's
+ * own previously-saved blueprint. */
+function hydrateFromLayers(layers: BlueprintLayer[], tierCount: number) {
+  const tierColors = Array.from({ length: tierCount }, (_, i) => {
+    const fill = layers.find(
+      (l): l is BlueprintLayer & { hex: string } =>
+        l.type === "color_fill" && l.target === `tier_${i + 1}_body`,
+    );
+    return fill?.hex ?? "#FFF3DE";
+  });
+
+  const placed: PlacedSticker[] = layers
+    .filter(
+      (
+        l,
+      ): l is BlueprintLayer & {
+        asset_id: string;
+        x: number;
+        y: number;
+        scale: number;
+      } =>
+        l.type === "sticker" &&
+        typeof l.x === "number" &&
+        typeof l.y === "number" &&
+        typeof l.asset_id === "string",
+    )
+    .map((l) => {
+      const asset = STICKERS.find((s) => s.id === l.asset_id);
+      if (!asset) return null; // sticker no longer in the catalog -- skip rather than crash
+      return {
+        key: uuid(),
+        asset,
+        x: l.x * CANVAS_W,
+        y: l.y * CANVAS_H,
+        scale: l.scale ?? 1,
+      };
+    })
+    .filter((p): p is PlacedSticker => p !== null);
+
+  return { tierColors, placed };
+}
 
 function PlacedStickerImage({
   sticker,
@@ -100,19 +157,25 @@ function PlacedStickerImage({
 
 export default function CakeLayerEditor({
   onChange,
+  initial,
 }: {
   onChange?: (data: { layers: BlueprintLayer[]; tiers: TierConfig[] }) => void;
+  initial?: { layers: BlueprintLayer[]; tiers: TierConfig[] };
 }) {
-  const [tiers, setTiers] = useState<TierConfig[]>([
-    { shape: "round" },
-    { shape: "round" },
-  ]);
-  const [tierColors, setTierColors] = useState<string[]>([
-    "#FFF3DE",
-    "#FFF3DE",
-  ]);
+  const startingTiers: TierConfig[] =
+    initial?.tiers && initial.tiers.length > 0
+      ? initial.tiers
+      : [{ shape: "round" }, { shape: "round" }];
+  const hydrated = initial
+    ? hydrateFromLayers(initial.layers, startingTiers.length)
+    : null;
+
+  const [tiers, setTiers] = useState<TierConfig[]>(startingTiers);
+  const [tierColors, setTierColors] = useState<string[]>(
+    hydrated?.tierColors ?? startingTiers.map(() => "#FFF3DE"),
+  );
   const [selectedTier, setSelectedTier] = useState(0);
-  const [placed, setPlaced] = useState<PlacedSticker[]>([]);
+  const [placed, setPlaced] = useState<PlacedSticker[]>(hydrated?.placed ?? []);
 
   function emit(
     nextColors: string[],

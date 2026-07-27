@@ -31,10 +31,14 @@ export type BlueprintLayer =
       rotation: number;
     };
 
+export type TierShape = "round" | "square";
+export type TierConfig = { shape: TierShape };
+
 export type Blueprint = {
   id: string;
   template_id: string | null;
   bakery_id: string;
+  tiers: TierConfig[];
   layers: Record<string, unknown>[];
   preview_render_url: string | null;
 };
@@ -56,9 +60,6 @@ export type CurrentUser = {
   email: string | null;
   role: "customer" | "bakery_owner" | "admin";
 };
-
-export type TierShape = "round" | "square";
-export type TierConfig = { shape: TierShape };
 
 export type TemplateCustomizationRules = {
   colors_editable: boolean;
