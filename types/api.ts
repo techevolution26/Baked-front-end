@@ -50,6 +50,7 @@ export type Order = {
   payment_status: string;
   order_status: string;
   created_at: string;
+  customer_username?: string;
 };
 
 export type CurrentUser = {

@@ -1,8 +1,8 @@
 /**
- * Shared color palette and sticker catalog -- used by CakeLayerEditor
- * (for picking/placing) and OrderSpecification (for turning a saved
- * blueprint back into human-readable names for the baker). Kept in one
- * place so a color's hex always maps to the same name everywhere.
+ * Shared cake design assets -- color swatches and the sticker catalog.
+ * Lives here (not inside CakeLayerEditor.tsx) so other surfaces, like
+ * the bakery's order detail page, can show human-readable names (e.g.
+ * "Berry" instead of "#C13F5E") without duplicating this list.
  */
 
 export type ColorSwatch = { id: string; hex: string; name: string };
@@ -42,3 +42,17 @@ export const STICKERS: StickerAsset[] = [
     name: "Flower",
   },
 ];
+
+/** Human-readable name for a swatch hex -- falls back to the raw hex
+ * if it's a legacy/custom color not in our palette. */
+export function colorName(hex: string): string {
+  if (!hex || typeof hex !== "string") return "Custom color";
+  return (
+    SWATCHES.find((s) => s.hex.toLowerCase() === hex.toLowerCase())?.name ?? hex
+  );
+}
+
+/** Human-readable name for a sticker asset id. */
+export function stickerName(assetId: string): string {
+  return STICKERS.find((s) => s.id === assetId)?.name ?? "Sticker";
+}

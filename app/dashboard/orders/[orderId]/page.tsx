@@ -1,6 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { getToken } from "@/lib/session";
-import { fetchOrderById, fetchBlueprintById } from "@/lib/api";
+import {
+  fetchOrderById,
+  fetchBlueprintById,
+  fetchTemplateById,
+} from "@/lib/api";
 import DashboardOrderActions from "@/components/DashboardOrderActions";
 import OrderSpecification from "@/components/OrderSpecification";
 
@@ -17,20 +21,42 @@ export default async function DashboardOrderDetailPage({
   if (!order) notFound();
 
   const blueprint = await fetchBlueprintById(order.blueprint_id);
+  const template = blueprint?.template_id
+    ? await fetchTemplateById(blueprint.template_id)
+    : null;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="max-w-4xl mx-auto p-2 flex flex-col gap-5">
       <div>
-        <h1 className="font-display text-2xl text-cocoa mb-2">Order detail</h1>
-        <p className="text-cocoa/60">KSh {order.price.toLocaleString()}</p>
-      </div>
-      {blueprint ? (
-        <OrderSpecification blueprint={blueprint} />
-      ) : (
+        <h1 className="font-display text-2xl text-cocoa mb-1">Order detail</h1>
         <p className="text-cocoa/60">
-          Could not load the design specification.
+          {template?.name ?? "Custom cake"} &middot; KSh{" "}
+          {order.price.toLocaleString()}
+        </p>
+      </div>
+
+      {blueprint ? (
+        <OrderSpecification
+          blueprint={blueprint}
+          customerName={order.customer_username ?? "Bakery Customer"}
+        />
+      ) : (
+        <p className="text-cocoa/60 italic">
+          Could not load the design specifications.
         </p>
       )}
+
+      {template?.story && (
+        <div className="rounded-2xl bg-cocoa/5 p-5 border border-cocoa/10">
+          <p className="text-xs text-cocoa/50 uppercase tracking-wide font-semibold mb-1.5">
+            About this recipe design
+          </p>
+          <p className="text-sm text-cocoa/80 leading-relaxed italic">
+            &ldquo;{template.story}&rdquo;
+          </p>
+        </div>
+      )}
+
       <DashboardOrderActions
         orderId={order.id}
         currentStatus={order.order_status}
