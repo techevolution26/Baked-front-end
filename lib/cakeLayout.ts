@@ -1,12 +1,3 @@
-/**
- * Shared cake geometry -- both CakeLayerEditor (2D Konva) and
- * Cake3DPreview (Three.js) compute tier positions/sizes from this one
- * module instead of each hardcoding their own layout. That's what
- * keeps them visually consistent as tier count/shape changes, and
- * lets a sticker's canvas position be mapped to the correct tier by
- * either renderer.
- */
-
 import type { TierShape, TierConfig } from "@/types/api";
 export type { TierShape, TierConfig };
 
@@ -31,7 +22,6 @@ export type TierLayout = {
   bottomY: number;
 };
 
-/** Ordered bottom-to-top: index 0 is the biggest, bottom-most tier. */
 export function computeTierLayouts(tiers: TierConfig[]): TierLayout[] {
   const n = tiers.length;
   return tiers.map((tier, i) => {
@@ -51,8 +41,6 @@ export function computeTierLayouts(tiers: TierConfig[]): TierLayout[] {
   });
 }
 
-/** Given a normalized (0-1) canvas y, which tier band does it fall in?
- * Used to know which tier a sticker "belongs to" for the 3D preview. */
 export function tierIndexForY(tiers: TierConfig[], yNorm: number): number {
   const layouts = computeTierLayouts(tiers);
   const yPx = yNorm * CANVAS_H;
@@ -62,7 +50,7 @@ export function tierIndexForY(tiers: TierConfig[], yNorm: number): number {
   return 0;
 }
 
-const SCALE_3D = 90; // pixels per 3D unit, tuned to match prior hand-picked sizes
+const SCALE_3D = 90;
 
 export type Tier3D = {
   shape: TierShape;
@@ -71,7 +59,6 @@ export type Tier3D = {
   baseY: number;
 };
 
-/** Same geometry, converted to 3D world units and stacked bottom-up. */
 export function tierLayoutsTo3D(tiers: TierConfig[]): Tier3D[] {
   const layouts = computeTierLayouts(tiers);
   let cumulativeHeight = 0;

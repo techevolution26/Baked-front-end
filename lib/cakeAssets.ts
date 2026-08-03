@@ -1,10 +1,3 @@
-/**
- * Shared cake design assets -- color swatches and the sticker catalog.
- * Lives here (not inside CakeLayerEditor.tsx) so other surfaces, like
- * the bakery's order detail page, can show human-readable names (e.g.
- * "Berry" instead of "#C13F5E") without duplicating this list.
- */
-
 export type ColorSwatch = { id: string; hex: string; name: string };
 export type StickerAsset = { id: string; thumbnailUrl: string; name: string };
 
@@ -43,8 +36,6 @@ export const STICKERS: StickerAsset[] = [
   },
 ];
 
-/** Human-readable name for a swatch hex -- falls back to the raw hex
- * if it's a legacy/custom color not in our palette. */
 export function colorName(hex: string): string {
   if (!hex || typeof hex !== "string") return "Custom color";
   return (
@@ -52,7 +43,6 @@ export function colorName(hex: string): string {
   );
 }
 
-/** Human-readable name for a sticker asset id. */
 export function stickerName(assetId: string): string {
   return STICKERS.find((s) => s.id === assetId)?.name ?? "Sticker";
 }

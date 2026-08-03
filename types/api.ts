@@ -32,7 +32,7 @@ export type BlueprintLayer =
     };
 
 export type TierShape = "round" | "square";
-export type TierConfig = { shape: TierShape };
+export type TierConfig = { shape: TierShape; kg: number };
 
 export type Blueprint = {
   id: string;
@@ -66,4 +66,15 @@ export type TemplateCustomizationRules = {
   colors_editable: boolean;
   stickers_editable: boolean;
   max_stickers: number;
+};
+
+export type PricingCategory = {
+  id: string;
+  label: string;
+  price_per_kg: number;
+};
+
+export type PricingConfig = {
+  categories: PricingCategory[];
+  sticker_surcharge: number;
 };
