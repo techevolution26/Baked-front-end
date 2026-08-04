@@ -81,10 +81,6 @@ export default function SiteHeader({
                 </Link>
               )}
 
-              <Link href="/account" className={desktopLinkStyles("/account")}>
-                Account
-              </Link>
-
               {isBakeryOwner && (
                 <Link
                   href="/dashboard"
@@ -93,6 +89,10 @@ export default function SiteHeader({
                   Bakery dashboard
                 </Link>
               )}
+
+              <Link href="/account" className={desktopLinkStyles("/account")}>
+                Account
+              </Link>
 
               {/* Log Out CTA */}
               <button

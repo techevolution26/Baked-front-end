@@ -22,6 +22,7 @@ export async function fetchCurrentUser(
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
+  if (res.status === 401) return null; // expected/frequent (unauthenticated) -- not worth logging as an error
   if (!res.ok) return logAndNull(res, "GET /users/me");
   return res.json();
 }

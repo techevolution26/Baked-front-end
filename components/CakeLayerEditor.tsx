@@ -1,32 +1,22 @@
 "use client";
 
-/**
- * CakeLayerEditor -- tap-and-drag cake customization canvas.
- *
- * Two modes:
- * - Studio/authoring (no `customization` prop): full control -- add/
- *   remove tiers, mix shapes, unrestricted colors and stickers.
- * - Customer (`customization` prop provided): tier shape/count is
- *   fixed (a structural, owner-only decision), colors/stickers gated
- *   by whatever the owner allowed. Weight (kg) per tier is ALWAYS
- *   editable in both modes -- quantity is a checkout concern, not a
- *   visual design one, and directly drives price (see DesignPageClient).
- *
- * Pass `initial` to seed the canvas from an existing design.
- *
- * Geometry comes from lib/cakeLayout.ts, shared with Cake3DPreview.
- * Colors/stickers come from lib/cakeAssets.ts, shared with anything
- * that needs to show a human-readable spec (e.g. the bakery's order
- * detail page).
- *
- * Emits { layers, tiers } via onChange.
- */
-
 import { useState } from "react";
 import { Stage, Layer, Ellipse, Rect, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 import { v4 as uuid } from "uuid";
 import type { KonvaEventObject } from "konva/lib/Node";
+import {
+  Minus,
+  Plus,
+  Circle,
+  Square,
+  Palette,
+  Check,
+  Sticker,
+  Lock,
+  Trash2,
+} from "lucide-react";
+
 import type { BlueprintLayer } from "@/types/api";
 import { SWATCHES, STICKERS, type StickerAsset } from "@/lib/cakeAssets";
 import {
@@ -38,6 +28,8 @@ import {
   type TierConfig,
   type TierShape,
 } from "@/lib/cakeLayout";
+
+// --- Types ---
 
 type PlacedSticker = {
   key: string;
@@ -52,6 +44,8 @@ type CustomizationRules = {
   stickersEditable: boolean;
   maxStickers: number;
 };
+
+// --- Helper Functions ---
 
 function hydrateFromLayers(layers: BlueprintLayer[], tierCount: number) {
   const tierColors = Array.from({ length: tierCount }, (_, i) => {
@@ -119,9 +113,19 @@ function PlacedStickerImage({
       }
       onDblClick={() => onRemove(sticker.key)}
       onDblTap={() => onRemove(sticker.key)}
+      onMouseEnter={(e) => {
+        const container = e.target.getStage()?.container();
+        if (container) container.style.cursor = "move";
+      }}
+      onMouseLeave={(e) => {
+        const container = e.target.getStage()?.container();
+        if (container) container.style.cursor = "default";
+      }}
     />
   );
 }
+
+// --- Main Component ---
 
 export default function CakeLayerEditor({
   onChange,
@@ -132,6 +136,7 @@ export default function CakeLayerEditor({
   initial?: { layers: BlueprintLayer[]; tiers: TierConfig[] };
   customization?: CustomizationRules;
 }) {
+  // 1. Initialization Logic
   const startingTiers: TierConfig[] =
     initial?.tiers && initial.tiers.length > 0
       ? initial.tiers
@@ -143,6 +148,7 @@ export default function CakeLayerEditor({
     ? hydrateFromLayers(initial.layers, startingTiers.length)
     : null;
 
+  // 2. State Management
   const [tiers, setTiers] = useState<TierConfig[]>(startingTiers);
   const [tierColors, setTierColors] = useState<string[]>(
     hydrated?.tierColors ?? startingTiers.map(() => "#FFF3DE"),
@@ -150,11 +156,13 @@ export default function CakeLayerEditor({
   const [selectedTier, setSelectedTier] = useState(0);
   const [placed, setPlaced] = useState<PlacedSticker[]>(hydrated?.placed ?? []);
 
-  const canEditTiers = !customization; // shape/count -- structural, owner-only
+  // 3. Permission Logic
+  const canEditTiers = !customization;
   const canEditColors = !customization || customization.colorsEditable;
   const canEditStickers = !customization || customization.stickersEditable;
   const maxStickers = customization ? customization.maxStickers : Infinity;
 
+  // 4. Update Emitter
   function emit(
     nextColors: string[],
     nextPlaced: PlacedSticker[],
@@ -180,6 +188,7 @@ export default function CakeLayerEditor({
     onChange?.({ layers, tiers: nextTiers });
   }
 
+  // 5. Action Handlers
   function pickColor(hex: string) {
     if (!canEditColors) return;
     const next = [...tierColors];
@@ -249,207 +258,319 @@ export default function CakeLayerEditor({
   const tierLayouts = computeTierLayouts(tiers);
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:items-start">
-      <div
-        className="relative mx-auto overflow-hidden rounded-xl border-4 border-[#D4A537]/40 bg-white shadow-inner"
-        style={{ width: CANVAS_W, height: CANVAS_H }}
-      >
-        <Stage width={CANVAS_W} height={CANVAS_H}>
-          <Layer>
-            {tierLayouts.map((t, i) => {
-              const isSelected = selectedTier === i;
-              const stroke = isSelected ? "#C13F5E" : "rgba(0,0,0,0.08)";
-              const strokeWidth = isSelected ? 3 : 1;
-              const onSelect = () => setSelectedTier(i);
+    <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+      {/* ---------------- LEFT: INTERACTIVE CANVAS ---------------- */}
+      <div className="relative group mx-auto flex-shrink-0">
+        <div
+          className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+          style={{ width: CANVAS_W, height: CANVAS_H }}
+        >
+          <Stage width={CANVAS_W} height={CANVAS_H}>
+            <Layer>
+              {tierLayouts.map((t, i) => {
+                const isSelected = selectedTier === i;
+                const stroke = isSelected ? "#C13F5E" : "rgba(90, 59, 46, 0.1)";
+                const strokeWidth = isSelected ? 3 : 1;
+                const onSelect = () => setSelectedTier(i);
 
-              return t.shape === "round" ? (
-                <Ellipse
-                  key={i}
-                  x={t.centerX}
-                  y={t.centerY}
-                  radiusX={t.width / 2}
-                  radiusY={t.height / 2}
-                  fill={tierColors[i]}
-                  stroke={stroke}
-                  strokeWidth={strokeWidth}
-                  onClick={onSelect}
-                  onTap={onSelect}
+                return t.shape === "round" ? (
+                  <Ellipse
+                    key={i}
+                    x={t.centerX}
+                    y={t.centerY}
+                    radiusX={t.width / 2}
+                    radiusY={t.height / 2}
+                    fill={tierColors[i]}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    onClick={onSelect}
+                    onTap={onSelect}
+                    onMouseEnter={(e) => {
+                      const container = e.target.getStage()?.container();
+                      if (container) container.style.cursor = "pointer";
+                    }}
+                    onMouseLeave={(e) => {
+                      const container = e.target.getStage()?.container();
+                      if (container) container.style.cursor = "default";
+                    }}
+                  />
+                ) : (
+                  <Rect
+                    key={i}
+                    x={t.centerX - t.width / 2}
+                    y={t.centerY - t.height / 2}
+                    width={t.width}
+                    height={t.height}
+                    cornerRadius={6}
+                    fill={tierColors[i]}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    onClick={onSelect}
+                    onTap={onSelect}
+                    onMouseEnter={(e) => {
+                      const container = e.target.getStage()?.container();
+                      if (container) container.style.cursor = "pointer";
+                    }}
+                    onMouseLeave={(e) => {
+                      const container = e.target.getStage()?.container();
+                      if (container) container.style.cursor = "default";
+                    }}
+                  />
+                );
+              })}
+              {placed.map((s) => (
+                <PlacedStickerImage
+                  key={s.key}
+                  sticker={s}
+                  onDrag={moveSticker}
+                  onRemove={removeSticker}
                 />
-              ) : (
-                <Rect
-                  key={i}
-                  x={t.centerX - t.width / 2}
-                  y={t.topY}
-                  width={t.width}
-                  height={t.height}
-                  cornerRadius={6}
-                  fill={tierColors[i]}
-                  stroke={stroke}
-                  strokeWidth={strokeWidth}
-                  onClick={onSelect}
-                  onTap={onSelect}
-                />
-              );
-            })}
+              ))}
+            </Layer>
+          </Stage>
+        </div>
 
-            {placed.map((s) => (
-              <PlacedStickerImage
-                key={s.key}
-                sticker={s}
-                onDrag={moveSticker}
-                onRemove={removeSticker}
-              />
-            ))}
-          </Layer>
-        </Stage>
+        {/* Canvas Meta Hint */}
+        <div className="absolute bottom-4 right-4 pointer-events-none bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg border border-stone-200 text-[10px] font-semibold text-cocoa/50 shadow-sm flex items-center gap-1">
+          <span>
+            {CANVAS_W} x {CANVAS_H}px
+          </span>
+        </div>
       </div>
 
-      <div className="flex w-full flex-col gap-6 md:w-56">
-        <div>
-          <p className="mb-2 text-sm font-medium text-[#5A3B2E]">
-            {canEditTiers ? "Tiers" : "Quantity"}
-          </p>
-          <div className="flex flex-col gap-2">
-            {tiers.map((tier, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-1.5">
+      {/* ---------------- RIGHT: CONTROL PANEL ---------------- */}
+      <div className="flex-1 flex flex-col gap-6 min-w-[300px] w-full">
+        {/* PANEL A: TIERS & STRUCTURE */}
+        <div className="rounded-2xl bg-white border border-stone-100 shadow-sm overflow-hidden">
+          <div className="bg-stone-50/80 border-b border-stone-100 px-5 py-4 flex items-center justify-between">
+            <div>
+              <h3 className="font-display font-bold text-cocoa text-sm">
+                {canEditTiers ? "Structure Configuration" : "Tier Quantity"}
+              </h3>
+              <p className="text-[10px] text-cocoa/50 mt-0.5">
+                {canEditTiers
+                  ? "Define shapes and stack height"
+                  : "Fixed design structure"}
+              </p>
+            </div>
+
+            {/* Add/Remove Buttons (Owner Only) */}
+            {canEditTiers && (
+              <div className="flex gap-1">
                 <button
-                  onClick={() => setSelectedTier(i)}
-                  className={`rounded-lg px-2 py-1 text-xs ${
-                    selectedTier === i
-                      ? "bg-[#C13F5E] text-white"
-                      : "border border-[#5A3B2E]/20 bg-white text-[#5A3B2E]"
-                  }`}
+                  onClick={removeTier}
+                  disabled={tiers.length <= MIN_TIERS}
+                  className="p-1.5 rounded-lg text-cocoa/40 hover:bg-red-50 hover:text-red-500 disabled:opacity-20 transition-colors"
+                  title="Remove top tier"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <div className="w-px h-6 bg-stone-200 my-auto mx-1" />
+                <button
+                  onClick={addTier}
+                  disabled={tiers.length >= MAX_TIERS}
+                  className="p-1.5 rounded-lg text-cocoa/40 hover:bg-berry/5 hover:text-berry disabled:opacity-20 transition-colors"
+                  title="Add tier"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="divide-y divide-stone-100">
+            {tiers.map((tier, i) => (
+              <div
+                key={i}
+                className={`px-5 py-3 flex items-center gap-3 transition-colors cursor-pointer ${selectedTier === i ? "bg-berry/[0.02]" : "hover:bg-stone-50"}`}
+                onClick={() => setSelectedTier(i)}
+              >
+                {/* Active Indicator */}
+                <div
+                  className={`w-1.5 h-1.5 rounded-full mr-1 ${selectedTier === i ? "bg-berry" : "bg-stone-200"}`}
+                />
+
+                {/* Tier Label */}
+                <span
+                  className={`text-xs font-bold uppercase tracking-wider min-w-[48px] ${selectedTier === i ? "text-berry" : "text-cocoa/60"}`}
                 >
                   Tier {i + 1}
-                </button>
+                </span>
+
+                {/* Shape Toggles (Owner Only) */}
                 {canEditTiers && (
-                  <>
+                  <div className="flex bg-stone-100 rounded-lg p-0.5 mx-2">
                     <button
-                      onClick={() => setTierShape(i, "round")}
-                      aria-label={`Tier ${i + 1} round`}
-                      className={`rounded-lg px-2 py-1 text-xs ${
-                        tier.shape === "round"
-                          ? "bg-[#D4A537] text-white"
-                          : "border border-[#5A3B2E]/20 bg-white text-[#5A3B2E]"
-                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTierShape(i, "round");
+                      }}
+                      className={`p-1.5 rounded-md transition-all ${tier.shape === "round" ? "bg-white shadow-sm text-cocoa" : "text-cocoa/40"}`}
+                      title="Round Shape"
                     >
-                      Round
+                      <Circle className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => setTierShape(i, "square")}
-                      aria-label={`Tier ${i + 1} square`}
-                      className={`rounded-lg px-2 py-1 text-xs ${
-                        tier.shape === "square"
-                          ? "bg-[#D4A537] text-white"
-                          : "border border-[#5A3B2E]/20 bg-white text-[#5A3B2E]"
-                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTierShape(i, "square");
+                      }}
+                      className={`p-1.5 rounded-md transition-all ${tier.shape === "square" ? "bg-white shadow-sm text-cocoa" : "text-cocoa/40"}`}
+                      title="Square Shape"
                     >
-                      Square
+                      <Square className="w-3.5 h-3.5" />
                     </button>
-                  </>
+                  </div>
                 )}
-                <input
-                  type="number"
-                  min={0.5}
-                  step={0.5}
-                  value={tier.kg}
-                  onChange={(e) => setTierKg(i, Number(e.target.value))}
-                  aria-label={`Tier ${i + 1} weight in kg`}
-                  className="w-16 rounded-lg border border-[#5A3B2E]/20 px-2 py-1 text-xs"
-                />
-                <span className="text-xs text-[#5A3B2E]/50">kg</span>
+
+                {/* Weight Input (Spacer) */}
+                <div className="ml-auto flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0.5}
+                    step={0.5}
+                    value={tier.kg}
+                    onChange={(e) => setTierKg(i, parseFloat(e.target.value))}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-14 rounded-lg border border-stone-200 text-xs font-medium text-center py-1.5 px-1 focus:border-berry focus:ring-1 focus:ring-berry/20 outline-none text-cocoa"
+                  />
+                  <span className="text-[10px] font-bold text-cocoa/40 uppercase">
+                    kg
+                  </span>
+                </div>
               </div>
             ))}
           </div>
-          {canEditTiers && (
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={addTier}
-                disabled={tiers.length >= MAX_TIERS}
-                className="rounded-lg border border-[#5A3B2E]/20 bg-white px-3 py-1.5 text-xs disabled:opacity-40"
-              >
-                + Add tier
-              </button>
-              <button
-                onClick={removeTier}
-                disabled={tiers.length <= MIN_TIERS}
-                className="rounded-lg border border-[#5A3B2E]/20 bg-white px-3 py-1.5 text-xs disabled:opacity-40"
-              >
-                − Remove tier
-              </button>
-            </div>
-          )}
         </div>
 
-        {canEditColors ? (
-          <div>
-            <p className="mb-2 text-sm font-medium text-[#5A3B2E]">
-              {canEditTiers
-                ? "Tap a tier, then a color"
-                : "Tap the cake, then a color"}
+        {/* PANEL B: DECORATION */}
+        <div className="rounded-2xl bg-white border border-stone-100 shadow-sm overflow-hidden flex-1 flex flex-col">
+          <div className="bg-stone-50/80 border-b border-stone-100 px-5 py-4">
+            <h3 className="font-display font-bold text-cocoa text-sm">
+              Decoration Suite
+            </h3>
+            <p className="text-[10px] text-cocoa/50 mt-0.5">
+              {canEditColors
+                ? "Customize colors and toppings"
+                : "This design has fixed styling"}
             </p>
-            <div className="flex flex-wrap gap-2">
-              {SWATCHES.map((sw) => (
-                <button
-                  key={sw.id}
-                  aria-label={sw.name}
-                  onClick={() => pickColor(sw.hex)}
-                  className="h-9 w-9 rounded-full border-2 border-white shadow ring-1 ring-black/10 focus:outline-none focus:ring-2 focus:ring-[#C13F5E]"
-                  style={{ backgroundColor: sw.hex }}
-                />
-              ))}
-            </div>
           </div>
-        ) : (
-          customization && (
-            <p className="text-xs text-cocoa/40">
-              This bakery has set fixed colors for this design.
-            </p>
-          )
-        )}
 
-        {canEditStickers ? (
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium text-[#5A3B2E]">
-                Tap to add, drag to place
-              </p>
-              {customization && (
-                <p className="text-xs text-cocoa/40">
-                  {placed.length}/{maxStickers}
+          <div className="p-5 space-y-6">
+            {/* 1. Color Picker */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-xs font-bold text-cocoa/60 uppercase tracking-wide flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5" />
+                  Frosting Color
+                </label>
+                {!canEditColors && (
+                  <span className="flex items-center gap-1 bg-stone-100 text-stone-400 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                    <Lock className="w-2.5 h-2.5" /> Locked
+                  </span>
+                )}
+              </div>
+
+              {canEditColors ? (
+                <div className="grid grid-cols-6 gap-2">
+                  {SWATCHES.map((sw) => (
+                    <button
+                      key={sw.id}
+                      onClick={() => pickColor(sw.hex)}
+                      className={`relative w-8 h-8 rounded-full shadow-sm border border-black/5 transition-all hover:scale-110 active:scale-95 ${tierColors[selectedTier] === sw.hex ? "ring-2 ring-offset-1 ring-berry" : ""}`}
+                      style={{ backgroundColor: sw.hex }}
+                      title={sw.name}
+                    >
+                      {tierColors[selectedTier] === sw.hex && (
+                        <Check className="w-3.5 h-3.5 text-black/50 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 bg-stone-50 border border-stone-100 rounded-xl text-center">
+                  <p className="text-xs text-cocoa/40">
+                    The bakery has set a fixed color theme.
+                  </p>
+                </div>
+              )}
+              {canEditColors && (
+                <p className="text-[10px] text-cocoa/40 mt-2 text-right italic">
+                  Applying to Tier {selectedTier + 1}
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap gap-3">
-              {STICKERS.map((asset) => (
-                <button
-                  key={asset.id}
-                  onClick={() => addSticker(asset)}
-                  disabled={placed.length >= maxStickers}
-                  aria-label={`Add ${asset.name}`}
-                  className="flex h-12 w-12 items-center justify-center rounded-lg bg-white shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#C13F5E] disabled:opacity-40"
-                >
-                  <img
-                    src={asset.thumbnailUrl}
-                    alt={asset.name}
-                    className="h-8 w-8"
-                  />
-                </button>
-              ))}
+
+            <div className="h-px bg-stone-100 w-full" />
+
+            {/* 2. Sticker Tray */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-xs font-bold text-cocoa/60 uppercase tracking-wide flex items-center gap-1.5">
+                  <Sticker className="w-3.5 h-3.5" />
+                  Toppings
+                </label>
+                <div className="flex items-center gap-2">
+                  {canEditStickers && (
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${placed.length >= maxStickers ? "bg-red-50 text-red-500" : "bg-stone-100 text-cocoa/50"}`}
+                    >
+                      {placed.length} /{" "}
+                      {maxStickers === Infinity ? "∞" : maxStickers}
+                    </span>
+                  )}
+                  {!canEditStickers && (
+                    <span className="flex items-center gap-1 bg-stone-100 text-stone-400 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      <Lock className="w-2.5 h-2.5" /> Locked
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {canEditStickers ? (
+                <>
+                  <div
+                    className={`grid grid-cols-4 gap-3 ${placed.length >= maxStickers ? "opacity-50 pointer-events-none" : ""}`}
+                  >
+                    {STICKERS.map((asset) => (
+                      <button
+                        key={asset.id}
+                        onClick={() => addSticker(asset)}
+                        disabled={placed.length >= maxStickers}
+                        className="group flex flex-col items-center gap-1 focus:outline-none"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-white border border-stone-200 flex items-center justify-center p-1.5 shadow-sm transition-all group-hover:border-berry/30 group-hover:shadow-md group-active:scale-95">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={asset.thumbnailUrl}
+                            alt={asset.name}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {placed.length > 0 && (
+                    <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-50/50 border border-amber-100 text-amber-800/60">
+                      <Trash2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <p className="text-[10px] leading-relaxed">
+                        To remove an item,{" "}
+                        <span className="font-semibold">double-tap</span> it
+                        directly on the cake preview.
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-3 bg-stone-50 border border-stone-100 rounded-xl text-center">
+                  <p className="text-xs text-cocoa/40">
+                    Custom toppings are not enabled for this design.
+                  </p>
+                </div>
+              )}
             </div>
-            {placed.length > 0 && (
-              <p className="mt-2 text-xs text-cocoa/40">
-                Double-tap a sticker on the cake to remove it.
-              </p>
-            )}
           </div>
-        ) : (
-          customization && (
-            <p className="text-xs text-cocoa/40">
-              This bakery hasn't enabled custom stickers for this design.
-            </p>
-          )
-        )}
+        </div>
       </div>
     </div>
   );

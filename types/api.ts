@@ -31,13 +31,11 @@ export type BlueprintLayer =
       rotation: number;
     };
 
-export type TierShape = "round" | "square";
-export type TierConfig = { shape: TierShape; kg: number };
-
 export type Blueprint = {
   id: string;
   template_id: string | null;
   bakery_id: string;
+  category: string;
   tiers: TierConfig[];
   layers: Record<string, unknown>[];
   preview_render_url: string | null;
@@ -67,6 +65,9 @@ export type TemplateCustomizationRules = {
   stickers_editable: boolean;
   max_stickers: number;
 };
+
+export type TierShape = "round" | "square";
+export type TierConfig = { shape: TierShape; kg: number };
 
 export type PricingCategory = {
   id: string;

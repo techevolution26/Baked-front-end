@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 
 export default function CheckoutClient({
   blueprintId,
-  basePrice,
+  estimatedPrice,
 }: {
   blueprintId: string;
-  basePrice: number;
+  estimatedPrice: number;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,9 +41,16 @@ export default function CheckoutClient({
 
   return (
     <div className="rounded-2xl bg-white shadow p-6 mt-4">
-      <p className="text-cocoa/70 text-sm mb-4">
-        Starting price KSh {basePrice.toLocaleString()} -- final pricing and M-Pesa payment
-        are wired in next.
+      <div className="flex justify-between items-baseline mb-4">
+        <p className="text-cocoa/70 text-sm">Estimated total</p>
+        <p className="font-display text-xl text-berry">
+          KSh {estimatedPrice.toLocaleString()}
+        </p>
+      </div>
+      <p className="text-cocoa/50 text-xs mb-4">
+        Final price is confirmed when your order is placed. M-Pesa payment
+        isn&apos;t wired up yet -- this places the order with the bakery without
+        taking payment.
       </p>
       {error && <p className="text-berry text-sm mb-3">{error}</p>}
       <button
