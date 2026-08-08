@@ -1,10 +1,11 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   fetchBlueprintById,
   fetchTemplateById,
   fetchPricingConfig,
 } from "@/lib/api";
-import { getCurrentBakery } from "@/lib/tenant";
+import { getCurrentBakery, getTenantHost } from "@/lib/tenant";
+import { getToken } from "@/lib/session";
 import CheckoutClient from "@/components/CheckoutClient";
 import OrderSpecification from "@/components/OrderSpecification";
 
@@ -14,7 +15,11 @@ export default async function CheckoutPage({
   params: Promise<{ blueprintId: string }>;
 }) {
   const { blueprintId } = await params;
-  const blueprint = await fetchBlueprintById(blueprintId);
+  const token = await getToken();
+  if (!token) redirect(`/login?next=/checkout/${blueprintId}`);
+
+  const tenantHost = await getTenantHost();
+  const blueprint = await fetchBlueprintById(blueprintId, token, tenantHost);
   if (!blueprint) notFound();
 
   const currentBakery = await getCurrentBakery();

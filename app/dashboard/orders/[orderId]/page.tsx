@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getToken } from "@/lib/session";
+import { getTenantHost } from "@/lib/tenant";
 import {
   fetchOrderById,
   fetchBlueprintById,
@@ -19,8 +20,8 @@ export default async function DashboardOrderDetailPage({
 
   const order = await fetchOrderById(orderId, token);
   if (!order) notFound();
-
-  const blueprint = await fetchBlueprintById(order.blueprint_id);
+  const tenantHost = await getTenantHost();
+  const blueprint = await fetchBlueprintById(order.blueprint_id, token, tenantHost);
   const template = blueprint?.template_id
     ? await fetchTemplateById(blueprint.template_id)
     : null;

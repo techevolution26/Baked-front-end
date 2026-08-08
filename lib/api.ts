@@ -97,8 +97,18 @@ export async function fetchTemplateById(
 
 export async function fetchBlueprintById(
   id: string,
+  token?: string,
+  tenantHost?: string,
 ): Promise<Blueprint | null> {
-  const res = await fetch(`${API_URL}/blueprints/${id}`, { cache: "no-store" });
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (tenantHost) headers["x-tenant-host"] = tenantHost;
+
+  const res = await fetch(`${API_URL}/blueprints/${id}`, {
+    cache: "no-store",
+    headers,
+  });
+  if (res.status === 401) return null; // treat protected endpoints as "not available" to callers
   if (!res.ok) return logAndNull(res, `GET /blueprints/${id}`);
   return res.json();
 }
