@@ -62,17 +62,29 @@ export async function fetchBakeryById(id: string): Promise<Bakery | null> {
   return res.json();
 }
 
+export class BackendUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BackendUnavailableError";
+  }
+}
+
 export async function resolveBakeryByDomain(
   host: string,
 ): Promise<Bakery | null> {
-  const res = await fetch(
-    `${API_URL}/bakeries/resolve?host=${encodeURIComponent(host)}`,
-    {
-      next: { revalidate: 300 },
-    },
-  );
-  if (!res.ok) return null; // expected/frequent (unknown domain) -- not worth logging as an error
-  return res.json();
+  try {
+    const res = await fetch(
+      `${API_URL}/bakeries/resolve?host=${encodeURIComponent(host)}`,
+      {
+        next: { revalidate: 300 },
+      },
+    );
+    if (!res.ok) return null; // expected/frequent (unknown domain) -- not worth logging as an error
+    return res.json();
+  } catch (error) {
+    console.error("resolveBakeryByDomain network failure:", error);
+    throw new BackendUnavailableError("Could not reach backend");
+  }
 }
 
 export async function fetchTemplates(
@@ -108,8 +120,11 @@ export async function fetchBlueprintById(
     cache: "no-store",
     headers,
   });
-  if (res.status === 401) return null; // treat protected endpoints as "not available" to callers
-  if (!res.ok) return logAndNull(res, `GET /blueprints/${id}`);
+  if (res.status === 401) return null; // protected endpoint requires auth
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Unable to load blueprint (${res.status})`);
+  }
   return res.json();
 }
 

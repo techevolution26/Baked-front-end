@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { resolveBakeryByDomain } from "@/lib/api";
+import { resolveBakeryByDomain, BackendUnavailableError } from "@/lib/api";
 import type { Bakery } from "@/types/api";
 
 // Lets you preview a specific bakery's storefront locally without real
@@ -19,3 +19,5 @@ export async function getCurrentBakery(): Promise<Bakery | null> {
   if (!host) return null;
   return resolveBakeryByDomain(host);
 }
+
+export { BackendUnavailableError };
