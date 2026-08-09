@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "Cake Marketplace",
-  description: "Design your cake, tap and drag -- no typing required.",
+  description: "Design your Cake,Define your Taste of Desires,Place your fresh order.",
 };
 
 export default async function RootLayout({
